@@ -1,0 +1,112 @@
+﻿@using BuildingStore.Web.Services
+@inject ICartService CartService
+@inject IUserSessionService UserSession
+@inject NavigationManager Navigation
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">BuildingStore.Web</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <!-- Главная -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Главная
+            </NavLink>
+        </div>
+
+        <!-- Каталог -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="catalog">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Каталог
+            </NavLink>
+        </div>
+
+        @if (UserSession.CurrentUserId.HasValue)
+        {
+            <!-- Корзина (отображается только для авторизованных) -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="cart">
+                    <span class="bi bi-cart3-nav-menu" aria-hidden="true"></span> Корзина
+                    @if (cartCount > 0)
+                    {
+                        <span class="badge rounded-pill bg-danger ms-1">@cartCount</span>
+                    }
+                </NavLink>
+            </div>
+
+            <!-- Профиль -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="profile">
+                    <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Профиль
+                </NavLink>
+            </div>
+
+            <!-- Выход -->
+            <div class="nav-item px-3">
+                <a class="nav-link" href="" @onclick="HandleLogout">
+                    <span class="bi bi-box-arrow-right-nav-menu" aria-hidden="true"></span> Выйти
+                </a>
+            </div>
+        }
+        else
+        {
+            <!-- Вход -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="login">
+                    <span class="bi bi-box-arrow-in-right-nav-menu" aria-hidden="true"></span> Вход
+                </NavLink>
+            </div>
+
+            <!-- Регистрация -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="register">
+                    <span class="bi bi-person-plus-fill-nav-menu" aria-hidden="true"></span> Регистрация
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private int cartCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateCartCountAsync();
+    }
+
+    
+    protected override async Task OnParametersSetAsync()
+    {
+        await UpdateCartCountAsync();
+    }
+
+    private async Task UpdateCartCountAsync()
+    {
+        if (UserSession.CurrentUserId.HasValue)
+        {
+            var cart = await CartService.GetCartAsync(UserSession.CurrentUserId.Value);
+            cartCount = cart.Items?.Sum(i => i.Quantity) ?? 0;
+        }
+        else
+        {
+            cartCount = 0;
+        }
+    }
+
+    private void HandleLogout()
+    {
+        
+        UserSession.CurrentUserId = null;
+
+        
+        Navigation.NavigateTo("/", forceLoad: false);
+    }
+}
+

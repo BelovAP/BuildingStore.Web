@@ -1,0 +1,91 @@
+﻿@page "/cart"
+@using BuildingStore.Web.Services
+@using BuildingStore.Web.Models
+@inject ICartService CartService
+@inject IUserSessionService UserSession
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Корзина</PageTitle>
+
+<h2>🛒 Ваша корзина</h2>
+
+@if (UserSession.CurrentUserId == null)
+{
+    <div class="alert alert-warning">Войдите в систему, чтобы увидеть корзину. <a href="/login">Войти</a></div>
+}
+else
+{
+    @if (cart.Items.Count == 0)
+    {
+        <div class="alert alert-info">Корзина пуста. <a href="/catalog">Перейти в каталог</a></div>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Товар</th>
+                    <th>Цена</th>
+                    <th>Кол-во</th>
+                    <th>Сумма</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in cart.Items)
+                {
+                    <tr>
+                        <td>@item.Material.Name</td>
+                        <td>@item.Material.Price.ToString("C")</td>
+                        <td>
+                            <input type="number" class="form-control" style="width:80px"
+                                   value="@item.Quantity" min="1"
+                                   @onchange="@(e => UpdateQuantity(item.Id, int.Parse(e.Value.ToString()!)))" />
+                        </td>
+                        <td>@((item.Material.Price * item.Quantity).ToString("C"))</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveItem(item.Id)">✕</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="text-end fs-4 fw-bold">
+            Итого: @CartService.GetTotalPrice(cart).ToString("C")
+        </div>
+
+        <button class="btn btn-primary mt-3" @onclick="Checkout">Оформить заказ</button>
+    }
+}
+
+@code {
+    private BuildingStore.Web.Models.Cart cart = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserSession.CurrentUserId.HasValue)
+            cart = await CartService.GetCartAsync(UserSession.CurrentUserId.Value);
+    }
+
+    private async Task UpdateQuantity(int cartItemId, int newQty)
+    {
+        
+        await CartService.RemoveFromCartAsync(UserSession.CurrentUserId!.Value, cartItemId);
+        await CartService.AddToCartAsync(UserSession.CurrentUserId.Value, cart.Items.First(i => i.Id == cartItemId).MaterialId, newQty);
+        cart = await CartService.GetCartAsync(UserSession.CurrentUserId.Value);
+    }
+
+    private async Task RemoveItem(int cartItemId)
+    {
+        await CartService.RemoveFromCartAsync(UserSession.CurrentUserId!.Value, cartItemId);
+        cart = await CartService.GetCartAsync(UserSession.CurrentUserId.Value);
+    }
+
+    private void Checkout()
+    {
+        
+        Navigation.NavigateTo("/catalog?order=success");
+    }
+}

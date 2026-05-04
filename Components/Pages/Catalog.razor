@@ -1,0 +1,173 @@
+﻿@page "/catalog"
+@inject IMaterialService MaterialService
+@inject ICartService CartService
+@inject IUserSessionService UserSession
+@inject NavigationManager Navigation
+@using BuildingStore.Web.Models
+@using BuildingStore.Web.Services
+@rendermode InteractiveServer
+
+<PageTitle>Каталог стройматериалов</PageTitle>
+
+<h2>📋 Каталог стройматериалов</h2>
+
+<!-- Фильтр по категориям -->
+<div class="mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <label class="form-label">Фильтр по категории:</label>
+            <select @bind="selectedCategoryId" class="form-select">
+                <option value="0">Все категории</option>
+                @foreach (var cat in categories)
+                {
+                    <option value="@cat.Id">@cat.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-6 text-end">
+            <p class="text-muted mb-0">
+                Найдено товаров: <strong>@filteredMaterials.Count</strong>
+            </p>
+        </div>
+    </div>
+</div>
+
+@if (materials == null)
+{
+    <div class="alert alert-info">
+        <div class="spinner-border spinner-border-sm me-2" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+        Загрузка каталога...
+    </div>
+}
+else if (filteredMaterials.Count == 0)
+{
+    <div class="alert alert-warning">
+        Товаров в данной категории не найдено.
+        @if (selectedCategoryId != 0)
+        {
+            <a href="#" @onclick="() => selectedCategoryId = 0" class="alert-link">Показать все товары</a>
+        }
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var material in filteredMaterials)
+        {
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">@material.Name</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">
+                            <span class="badge bg-secondary">@material.Category?.Name</span>
+                        </h6>
+                        <p class="card-text">
+                            <strong>Цена:</strong> <span class="text-success fs-5">@material.Price.ToString("C")</span><br>
+                            <strong>Остаток на складе:</strong> @material.Stock шт.
+                        </p>
+
+                        @if (material.Stock > 0)
+                        {
+                            <span class="badge bg-success mb-2">✓ В наличии</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger mb-2">✗ Под заказ</span>
+                        }
+                    </div>
+                    <div class="card-footer bg-white border-top">
+                        <div class="d-grid gap-2">
+                            <a href="/material/edit/@material.Id" class="btn btn-outline-primary btn-sm">
+                                📄 Подробнее
+                            </a>
+                            @if (material.Stock > 0)
+                            {
+                                <button class="btn btn-success btn-sm"
+                                        @onclick="() => AddToCart(material.Id)"
+                                        disabled="@isAddingToCart">
+                                    @if (isAddingToCart)
+                                    {
+                                        <span>
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            Добавление...
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span>🛒 В корзину</span>
+                                    }
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-secondary btn-sm" disabled>
+                                    Нет в наличии
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<BuildingMaterial> materials = new();
+    private List<Category> categories = new();
+    private int selectedCategoryId = 0;
+    private bool isAddingToCart = false;
+
+    private List<BuildingMaterial> filteredMaterials =>
+        selectedCategoryId == 0
+            ? materials
+            : materials.Where(m => m.CategoryId == selectedCategoryId).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMaterials();
+    }
+
+    private async Task LoadMaterials()
+    {
+        materials = await MaterialService.GetAllAsync();
+        categories = materials
+            .Where(m => m.Category != null)
+            .Select(m => m.Category!)
+            .DistinctBy(c => c.Id)
+            .OrderBy(c => c.Name)
+            .ToList();
+    }
+
+    private async Task AddToCart(int materialId)
+    {
+        
+        if (UserSession.CurrentUserId == null)
+        {
+            Navigation.NavigateTo("/login?returnUrl=/catalog");
+            return;
+        }
+
+        try
+        {
+            isAddingToCart = true;
+            StateHasChanged();
+
+            await CartService.AddToCartAsync(UserSession.CurrentUserId.Value, materialId, 1);
+
+            
+            await LoadMaterials(); 
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ошибка добавления в корзину: {ex.Message}");
+        }
+        finally
+        {
+            isAddingToCart = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,114 @@
+﻿@page "/login"
+@inject IUserService UserService
+@inject IUserSessionService UserSession
+@inject NavigationManager Navigation
+@using BuildingStore.Web.Models
+@using BuildingStore.Web.Services
+@rendermode InteractiveServer
+
+<PageTitle>Вход в систему</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-5">
+                    <h2 class="card-title text-center mb-4">🔐 Вход</h2>
+
+                    <!-- Сообщение об успехе (приходит после регистрации) -->
+                    @if (!string.IsNullOrEmpty(SuccessMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @SuccessMessage
+                            <button type="button" class="btn-close" @onclick="() => SuccessMessage = null" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <!-- Сообщение об ошибке -->
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @ErrorMessage
+                            <button type="button" class="btn-close" @onclick="() => ErrorMessage = null" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <!-- Форма входа -->
+                    <EditForm Model="@LoginModel" OnValidSubmit="HandleLogin">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger small mb-3" />
+
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Логин или Email</label>
+                            <InputText @bind-Value="LoginModel.UsernameOrEmail"
+                                       class="form-control"
+                                       id="username"
+                                       placeholder="Введите логин или email" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="password" class="form-label">Пароль</label>
+                            <InputText @bind-Value="LoginModel.Password"
+                                       class="form-control"
+                                       id="password"
+                                       type="password"
+                                       placeholder="Введите пароль" />
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">Войти</button>
+                        </div>
+                    </EditForm>
+
+                    <hr class="my-4" />
+
+                    <div class="text-center text-muted">
+                        <p class="mb-0">Ещё нет аккаунта? <a href="/register" class="text-decoration-none">Зарегистрироваться</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    
+    private LoginDto LoginModel = new() { UsernameOrEmail = "", Password = "" };
+
+    private string? ErrorMessage;
+    private string? SuccessMessage;
+
+    
+    [SupplyParameterFromQuery(Name = "registered")]
+    public bool IsRegistered { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (IsRegistered)
+        {
+            SuccessMessage = "Регистрация прошла успешно! Пожалуйста, войдите в систему.";
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        ErrorMessage = null; 
+
+       
+        var user = await UserService.LoginAsync(LoginModel);
+
+        if (user != null)
+        {
+            
+            UserSession.CurrentUserId = user.Id;
+
+            
+            Navigation.NavigateTo("/catalog", forceLoad: false);
+        }
+        else
+        {
+            
+            ErrorMessage = "Неверный логин или пароль.";
+        }
+    }
+}
